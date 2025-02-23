@@ -1,7 +1,8 @@
 use std::ptr::read;
-use secp256k1::{All, Message, Secp256k1, SecretKey};
+use secp256k1::{All, Message, PublicKey, Secp256k1, SecretKey};
 use serde::{Deserialize, Serialize};
 use hex;
+use secp256k1::ecdsa::Signature;
 use sha2::{Digest, Sha256};
 
 const BASE_FEE: f64 = 0.1;
@@ -16,8 +17,14 @@ pub struct Transaction {
 
 #[derive(Debug, Clone)]
 pub struct SignedTransaction {
-    transaction: Transaction,
-    signature: Vec<u8>
+    pub(crate) transaction: Transaction,
+    pub(crate) signature: Vec<u8>
+}
+
+impl SignedTransaction {
+    pub fn is_valid(&self, public_key: &PublicKey) -> bool {
+        Transaction::verify_transaction(public_key, &self.transaction, &self.signature)
+    }
 }
 
 impl Transaction {
@@ -48,21 +55,34 @@ impl Transaction {
         })
     }
 
-    fn get_message(transaction_hash: &[u8]) -> Result<Message, String>{
-        match Message::from_slice(transaction_hash) {
-            Ok(message) => Ok(message),
-            Err(_) => return Err("Invalid message length".to_string())
+    pub fn verify_transaction(public_key: &PublicKey, transaction: &Transaction, signature: &[u8]) -> bool {
+        let secp: Secp256k1<All> = Secp256k1::new();
+        let transaction_hash = Self::hash_transaction(transaction);
+        let message_hash = Self::get_message(&transaction_hash).expect("Failed to get message");
+
+        let parsed_signature = match Signature::from_compact(signature) {
+            Ok(sig) => sig,
+            Err(_) => return false,
+        };
+
+        secp.verify_ecdsa(&message_hash, &parsed_signature, public_key).is_ok()
+    }
+
+    fn parse_signature(signature: &[u8]) -> Result<Signature, String> {
+        match Signature::from_compact(signature) {
+            Ok(sig) => Ok(sig),
+            Err(_) => Err("Failed to parse signature".to_string()),
         }
+    }
+    fn get_message(transaction_hash: &[u8]) -> Result<Message, String> {
+        Message::from_slice(transaction_hash).map_err(|_| "Invalid message length".to_string())
     }
 
     // Decode hex string into bytes and convert them into a SecretKey
     fn get_private_key(private_key: &str) -> Result<SecretKey, String> {
-        match SecretKey::from_slice(&hex::decode(private_key).expect("Failed to decode private key")) {
-            Ok(secret_key) => {
-                Ok(secret_key)
-            }
-            Err(_) => return Err("Invalid private key".to_string())
-        }
+        hex::decode(private_key)
+            .map_err(|_| "Failed to decode private key".to_string())
+            .and_then(|bytes| SecretKey::from_slice(&bytes).map_err(|_| "Invalid private key".to_string()))
     }
 
     fn hash_transaction(tx: &Transaction) -> [u8; 32] {
