@@ -1,19 +1,41 @@
+use rand::rngs::OsRng;
+use secp256k1::{PublicKey, Secp256k1, SecretKey};
 use crate::blockchain::transaction::Transaction;
 
 mod blockchain;
 
 
 fn main() {
+    let secp = Secp256k1::new();
+    let mut rng = OsRng;
 
+    // Generate a random private key
+    let private_key = SecretKey::new(&mut rng);
+    let public_key = PublicKey::from_secret_key(&secp, &private_key);
 
-    // Alice wants to send 0.3 BTC to Bob
-    let transaction = Transaction::new(String::from("Angelos"), String::from("Bill"), 34.4, );
+    let private_key_hex = hex::encode(private_key.secret_bytes());
 
-    // Alice's Private Key (Example - NEVER USE IN REAL LIFE)
-    let private_key = "c8a2f842e2a3b8df4d450ddbd617f498c2f24b4b5f59c598d98b4dca15b3be62";
+    let transaction = Transaction::new(
+        "Alice".to_string(),
+        "Bob".to_string(),
+        10.0, // Sending 10 coins
+    );
 
-    match Transaction::sing_transaction(&transaction, private_key) {
-        Ok(signed_tx) => println!("✅ Signed Transaction: {:?}", signed_tx),
-        Err(e) => println!("❌ Error signing transaction: {}", e),
+    // Sign the transaction
+    match Transaction::sing_transaction(&transaction, &private_key_hex) {
+        Ok(signed_tx) => {
+            println!("✅ Transaction Signed Successfully");
+            println!("📜 Transaction: {:?}", signed_tx.transaction);
+            println!("✍️  Signature: {}", hex::encode(&signed_tx.signature));
+
+            // Verify the transaction
+            let is_valid = Transaction::verify_transaction(&public_key, &signed_tx.transaction, &signed_tx.signature);
+            if is_valid {
+                println!("🎉 Signature successfully verified!");
+            } else {
+                println!("❌ Signature verification failed.");
+            }
+        }
+        Err(e) => println!("❌ Error: {}", e),
     }
 }
