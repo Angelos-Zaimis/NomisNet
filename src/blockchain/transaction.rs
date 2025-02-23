@@ -21,6 +21,12 @@ pub struct SignedTransaction {
     pub(crate) signature: Vec<u8>
 }
 
+impl SignedTransaction {
+    pub fn is_valid(&self, public_key: &PublicKey) -> bool {
+        Transaction::verify_transaction(public_key, &self.transaction, &self.signature)
+    }
+}
+
 impl Transaction {
 
     pub fn new(sender: String, receiver: String, amount: f64) -> Self {
