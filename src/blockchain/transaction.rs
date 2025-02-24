@@ -17,8 +17,8 @@ pub struct Transaction {
 
 #[derive(Debug, Clone)]
 pub struct SignedTransaction {
-    pub(crate) transaction: Transaction,
-    pub(crate) signature: Vec<u8>
+    pub transaction: Transaction,
+    pub signature: Vec<u8>
 }
 
 impl SignedTransaction {
