@@ -32,6 +32,13 @@ impl Mempool {
     }
 
 
+    pub fn get_sorted_transactions(&self) -> Vec<Transaction> {
+        let pool = self.transactions.read().expect("Failed to acquire read lock");
+        let mut transactions: Vec<Transaction> = pool.values().cloned().collect();
+        transactions.sort_by(|a, b| b.fee.partial_cmp(&a.fee).unwrap());
+        transactions
+    }
+
     // TO-DO: remove transaction
 
     //TO-DO: get transaction
